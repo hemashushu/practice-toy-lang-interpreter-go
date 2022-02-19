@@ -1,10 +1,4 @@
-/**
- * Copyright (c) 2022 Hemashushu <hippospark@gmail.com>, All rights reserved.
- *
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
- */
+// original from https://interpreterbook.com/
 
 package ast
 
@@ -105,14 +99,8 @@ type ReturnStatement struct {
 	ReturnValue Expression
 }
 
-func (rs *ReturnStatement) statementNode() {
-	//
-}
-
-func (rs *ReturnStatement) TokenLiteral() string {
-	return rs.Token.Literal
-}
-
+func (rs *ReturnStatement) statementNode()       {}
+func (rs *ReturnStatement) TokenLiteral() string { return rs.Token.Literal }
 func (rs *ReturnStatement) String() string {
 	var out bytes.Buffer
 	out.WriteString(rs.TokenLiteral() + " ")
@@ -128,14 +116,8 @@ type ExpressionStatement struct {
 	Expression Expression
 }
 
-func (es *ExpressionStatement) statementNode() {
-
-}
-
-func (es *ExpressionStatement) TokenLiteral() string {
-	return es.Token.Literal
-}
-
+func (es *ExpressionStatement) statementNode()       {}
+func (es *ExpressionStatement) TokenLiteral() string { return es.Token.Literal }
 func (es *ExpressionStatement) String() string {
 	if es.Expression != nil {
 		return es.Expression.String()
@@ -161,7 +143,6 @@ type PrefixExpression struct {
 
 func (pe *PrefixExpression) expressionNode()      {}
 func (pe *PrefixExpression) TokenLiteral() string { return pe.Token.Literal }
-
 func (pe *PrefixExpression) String() string {
 	var out bytes.Buffer
 	out.WriteString("(")
@@ -178,15 +159,24 @@ type InfixExpression struct {
 	Right    Expression
 }
 
-func (pe *InfixExpression) expressionNode()      {}
-func (pe *InfixExpression) TokenLiteral() string { return pe.Token.Literal }
-
-func (pe *InfixExpression) String() string {
+func (ie *InfixExpression) expressionNode()      {}
+func (ie *InfixExpression) TokenLiteral() string { return ie.Token.Literal }
+func (ie *InfixExpression) String() string {
 	var out bytes.Buffer
 	out.WriteString("(")
-	out.WriteString(pe.Left.String())
-	out.WriteString(" " + pe.Operator + " ")
-	out.WriteString(pe.Right.String())
+	out.WriteString(ie.Left.String())
+	out.WriteString(" " + ie.Operator + " ")
+	out.WriteString(ie.Right.String())
 	out.WriteString(")")
 	return out.String()
 }
+
+// BooleanLiteral
+type Boolean struct {
+	Token token.Token
+	Value bool
+}
+
+func (il *Boolean) expressionNode()      {}
+func (il *Boolean) TokenLiteral() string { return il.Token.Literal }
+func (il *Boolean) String() string       { return il.Token.Literal }

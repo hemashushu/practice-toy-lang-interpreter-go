@@ -1,10 +1,4 @@
-/**
- * Copyright (c) 2022 Hemashushu <hippospark@gmail.com>, All rights reserved.
- *
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
- */
+// original from https://interpreterbook.com/
 
 package parser
 
@@ -18,14 +12,14 @@ import (
 
 // 表达式运算符的优先级别列表
 const (
-	_ int = iota
-	LOWEST
-	EQUALS      // ==
-	LESSGREATER // > or <
-	SUM         // +
-	PRODUCT     // *
-	PREFIX      // -X or !X
-	CALL        // myFunction(X)
+	_           int = iota
+	LOWEST          // 最低优先级，比如从 “语句” 进来的 "表达式" 解析阶段。
+	EQUALS          // ==
+	LESSGREATER     // > or <
+	SUM             // +
+	PRODUCT         // *
+	PREFIX          // -X or !X
+	CALL            // myFunction(X)
 )
 
 // 各个运算符 token 对应的优先级
@@ -41,6 +35,36 @@ var precedences = map[token.TokenType]int{
 	token.SLASH:    PRODUCT, // /
 	token.ASTERISK: PRODUCT, // *
 }
+
+// 解析的顺序按照各种 "语言元素（即语句、表达式等）" 的优先级来进行。
+//
+// 1. 先解析各种 "语句"，比如变量声明语句，函数定义语句等，
+//    语句之间是并排关系，没有优先级之分。
+// 2. "语句" 当中有 "表达式语句" 一类
+// 3. 解析 "表达式语句" 当中的 "表达式"
+//    a. 赋值表达式（假如语言允许连续赋值）
+//    b. 逻辑 or
+//    c. 逻辑 and
+//    d. 相等比较（==, !=）
+//    e. 大小比较（>, <, >=, <=）
+//	  f. 加减（+, -）
+//    g. 乘除（*, /）
+//
+//    (以上是二元运算/表达式，以下可以视为是一元运算/表达式)
+//
+//    h. 一元运算（正负数，逻辑非）
+//	  i. 对象成员或者函数调用（obj.prop, obj[index], func(...)）
+//    j. 基础表达式
+//
+//    基础表达式包括字面量（包括元组、列表、字典等字面量）、括号、标识符、new 表达式
+//    基础表达式单独出现，所以没有先后顺序。
+//    括号、元组、列表、字典当中允许任何 "表达式"，所以又会回到第 3 步。
+//
+//    注意如果语言支持 new 表达式的话：
+//    new (...) 表达式的优先级要比成员表达式的高，
+//    即 `new a(...).c(...)` 是 `(new a(...)).c(...)`
+//    new ... 表达式跟成员表达式一样，
+//    即 `new a.b.c(...)` 是 `new (a.b.c)()`
 
 type prefixParseFn func() ast.Expression              // Unary operator
 type infixParseFn func(ast.Expression) ast.Expression // Binary operator
@@ -81,6 +105,8 @@ func New(l *lexer.Lexer) *Parser {
 	// 注册 primary 表达式（字面量、标识符等）解析过程
 	p.registerPrefix(token.IDENT, p.parseIdentifier)
 	p.registerPrefix(token.INT, p.parseIntegerLiteral)
+	p.registerPrefix(token.TRUE, p.parseBooleanLiteral)
+	p.registerPrefix(token.FALSE, p.parseBooleanLiteral)
 
 	// 注册一元操作符解析过程
 	p.registerPrefix(token.BANG, p.parsePrefixExpression)
@@ -327,6 +353,23 @@ func (p *Parser) parseIntegerLiteral() ast.Expression {
 	return literal
 }
 
+func (p *Parser) parseBooleanLiteral() ast.Expression {
+	literal := &ast.Boolean{
+		Token: p.curToken,
+	}
+
+	// value, err := strconv.ParseBool(p.curToken.Literal)
+	// if err != nil {
+	// 	msg := fmt.Sprintf("could not parse %q as bool", p.curToken.Literal)
+	// 	p.errors = append(p.errors, msg)
+	// 	return nil
+	// }
+	//literal.Value = value
+
+	literal.Value = p.curTokenIs(token.TRUE) // 因为只有 token.TRUE 和 token.FALSE 两种情况
+	return literal
+}
+
 func (p *Parser) noPrefixParseFnError(t token.TokenType) {
 	msg := fmt.Sprintf("no prefix parse function for %q found", t)
 	p.errors = append(p.errors, msg)
@@ -352,6 +395,9 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	}
 	precedence := p.curPrecedence()
 	p.nextToken()
+
+	// 如果这里让 parseExpression(precedence -1) 可以实现
+	// 同一个运算符实现右->左结合
 	expression.Right = p.parseExpression(precedence)
 	return expression
 }
