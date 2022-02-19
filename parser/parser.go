@@ -19,7 +19,8 @@ const (
 	SUM             // +
 	PRODUCT         // *
 	PREFIX          // -X or !X
-	CALL            // myFunction(X)
+
+	// CALL            // myFunction(X)
 )
 
 // 各个运算符 token 对应的优先级
@@ -34,6 +35,8 @@ var precedences = map[token.TokenType]int{
 	token.MINUS:    SUM,     // -
 	token.SLASH:    PRODUCT, // /
 	token.ASTERISK: PRODUCT, // *
+
+	// token.LPAREN: CALL, // (
 }
 
 // 解析的顺序按照各种 "语言元素（即语句、表达式等）" 的优先级来进行。
@@ -108,7 +111,9 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.TRUE, p.parseBooleanLiteral)
 	p.registerPrefix(token.FALSE, p.parseBooleanLiteral)
 
-	p.registerPrefix(token.LPAREN, p.parseGroupedExpression)
+	p.registerPrefix(token.LPAREN, p.parseGroupedExpression)    // 表达式括号
+	p.registerPrefix(token.IF, p.parseIfExpression)             // 当前 toy lang 里，if 是表达式（而不是语句）
+	p.registerPrefix(token.FUNCTION, p.parseFunctionExpression) // 当前 toy lang 里，fn 是表达式
 
 	// 注册一元操作符解析过程
 	p.registerPrefix(token.BANG, p.parsePrefixExpression)
@@ -123,6 +128,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(token.NOT_EQ, p.parseInfixExpression)   // "!="
 	p.registerInfix(token.LT, p.parseInfixExpression)       // <
 	p.registerInfix(token.GT, p.parseInfixExpression)       // >
+	p.registerInfix(token.LPAREN, p.parseCallExpression)
 
 	return p
 }
@@ -151,7 +157,7 @@ func (p *Parser) peekTokenIs(t token.TokenType) bool {
 	return p.peekToken.Type == t
 }
 
-// 断言并消耗指定的 type 的 token
+// 断言并移动到指定的 type 的 token
 func (p *Parser) expectPeek(t token.TokenType) bool {
 	if p.peekTokenIs(t) {
 		p.nextToken()
@@ -168,10 +174,13 @@ func (p *Parser) ParseProgram() *ast.Program {
 
 	for p.curToken.Type != token.EOF {
 		statement := p.parseStatement()
-		// if statement != nil {
-		program.Statements = append(program.Statements, statement)
-		// }
+		if statement != nil {
+			program.Statements = append(program.Statements, statement)
+		}
 
+		// 解析完一条语句之后，向前移动一个 token（因为解析语句
+		// 的过程会把光标保留在语句的最后一个 token，通常是 ';' 符号，对于表达式，
+		// 则可能是表达式的最后一个 token ）
 		p.nextToken()
 	}
 
@@ -204,14 +213,21 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 		return nil
 	}
 
-	// TODO: We're skipping the expressions until we
-	// encounter a semicolon
-	for !p.curTokenIs(token.SEMICOLON) {
+	// // encounter a semicolon
+	// for !p.curTokenIs(token.SEMICOLON) {
+	// 	p.nextToken()
+	// }
+	// 检测到 ";" 就退出，并不消耗 ";" 符号
+
+	p.nextToken()
+
+	statement.Value = p.parseExpression(LOWEST)
+
+	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
 
-	// 检测到 ";" 就退出，并不消耗 ";" 符号
-	// i.e. 当前 token 停留在 ';' 位置
+	// 当前 token 停留在 ';' 位置
 	return statement
 }
 
@@ -222,14 +238,17 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 
 	p.nextToken()
 
-	// TODO: We're skipping the expressions until we
-	// encounter a semicolon
-	for !p.curTokenIs(token.SEMICOLON) {
+	// // encounter a semicolon
+	// for !p.curTokenIs(token.SEMICOLON) {
+	// 	p.nextToken()
+	// }
+
+	statement.ReturnValue = p.parseExpression(LOWEST)
+	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
 
 	// 当前 token 停留在 ';' 位置
-
 	return statement
 }
 
@@ -240,7 +259,13 @@ func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 
 	statement.Expression = p.parseExpression(LOWEST)
 
-	if p.peekTokenIs(token.SEMICOLON) { // 让当前 token 移动到 ';' 位置
+	// 如果下一个 token 是 ';' 则
+	//     让当前 token 移动到 ';' 位置
+	// 否则
+	//     保持当前的位置
+	//
+	// 即：expression 后面的 ';' 是可省的
+	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
 
@@ -257,6 +282,24 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 	}
 
 	leftExp := prefix()
+
+	// 判断是否函数调用
+	// 如果 leftExp 是标识符或者函数字面量，且下一个 token 是 "("
+	// 则视为函数调用
+	// 书中的方法是以符号 "(" 注册一个二元运算
+	// ...
+	// p.registerInfix(token.LPAREN, p.parseCallExpression)
+	// ...
+	//
+	// 虽然可行，但觉得有点取巧
+
+	switch leftExp.(type) {
+	case *ast.Identifier, *ast.FunctionLiteral:
+		if p.peekTokenIs(token.LPAREN) {
+			p.nextToken()
+			return p.parseCallExpression(leftExp)
+		}
+	}
 
 	for !p.peekTokenIs(token.SEMICOLON) && precedence < p.peekPrecedence() {
 		// 比较式 precedence < p.peekPrecedence() 表示：
@@ -372,6 +415,7 @@ func (p *Parser) parseBooleanLiteral() ast.Expression {
 	return literal
 }
 
+// (<expression>)
 func (p *Parser) parseGroupedExpression() ast.Expression {
 	p.nextToken()
 
@@ -414,4 +458,165 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	// 同一个运算符实现右->左结合
 	expression.Right = p.parseExpression(precedence)
 	return expression
+}
+
+// if (<condition>) <consequence> else <alternative>
+// <consequence> = <block statement>
+// <alternative> = <block statement>
+//
+// e.g.
+// "if (x > y) { x } else { y };"
+func (p *Parser) parseIfExpression() ast.Expression {
+	expression := &ast.IfExpression{Token: p.curToken}
+
+	// 移动到 "("
+	if !p.expectPeek(token.LPAREN) {
+		return nil
+	}
+	p.nextToken()
+
+	expression.Condition = p.parseExpression(LOWEST) // 解析 condition 表达式
+
+	// 移动到 ")"
+	if !p.expectPeek(token.RPAREN) {
+		return nil
+	}
+
+	// 移动到 "{"
+	if !p.expectPeek(token.LBRACE) {
+		return nil
+	}
+
+	expression.Consequence = p.parseBlockStatement()
+
+	// 'else' 部分是可选的
+	if p.peekTokenIs(token.ELSE) {
+
+		// 移动到 ELSE
+		p.nextToken()
+
+		// 移动到 "{"
+		if !p.expectPeek(token.LBRACE) {
+			return nil
+		}
+
+		expression.Alternative = p.parseBlockStatement()
+	}
+
+	// 当前 token 处于 "}" 符号上
+	return expression
+}
+
+// {<statements>}
+func (p *Parser) parseBlockStatement() *ast.BlockStatement {
+	block := &ast.BlockStatement{Token: p.curToken} // "{"
+	block.Statements = []ast.Statement{}
+
+	p.nextToken()
+
+	for !p.curTokenIs(token.RBRACE) && !p.curTokenIs(token.EOF) {
+		statement := p.parseStatement()
+		if statement != nil {
+			block.Statements = append(block.Statements, statement)
+		}
+		p.nextToken()
+	}
+
+	// 当前 token 处于 "}" 符号上
+
+	return block
+}
+
+// fn <parameters> <block statement>
+// <parameters> = (<parameter one>, <parameter two>, <parameter three>, ...)
+// e.g.
+// "fn (x,y) {return x+y;}"
+func (p *Parser) parseFunctionExpression() ast.Expression {
+
+	expression := &ast.FunctionLiteral{Token: p.curToken}
+
+	// 移动到 "("
+	if !p.expectPeek(token.LPAREN) {
+		return nil
+	}
+
+	// 解析参数列表
+	expression.Parameters = p.parseFunctionParameters()
+
+	// 当前处于 ")"，下一个 token 应该是 "{"
+
+	// 移动到 "{"
+	if !p.expectPeek(token.LBRACE) {
+		return nil
+	}
+
+	expression.Body = p.parseBlockStatement()
+
+	// 当前 token 处于 "}" 符号上
+	return expression
+}
+
+func (p *Parser) parseFunctionParameters() []*ast.Identifier {
+	identifiers := []*ast.Identifier{}
+
+	// 当前处于 "("
+
+	p.nextToken()
+
+	// 参数列表有可能为空
+	for !p.curTokenIs(token.RPAREN) {
+		identifier, ok := p.parseIdentifier().(*ast.Identifier)
+		if !ok {
+			return nil
+		}
+
+		identifiers = append(identifiers, identifier)
+
+		p.nextToken()
+
+		if p.curTokenIs(token.COMMA) {
+			p.nextToken()
+		}
+	}
+
+	// 当前处于 ")"
+	return identifiers
+}
+
+// <expression>(<comma separated expressions>)
+// e.g.
+// "add(2, 3)"
+// "add(2 + 2, 3 * 3 * 3)"
+// "fn(x, y) { x + y; }(2, 3)"
+// "callsFunction(2, 3, fn(x, y) { x + y; });"
+func (p *Parser) parseCallExpression(function ast.Expression) ast.Expression {
+	expression := &ast.CallExpression{
+		Token:    p.curToken, // "("
+		Function: function,
+	}
+	expression.Arguments = p.parseCallArguments()
+	return expression
+}
+
+func (p *Parser) parseCallArguments() []ast.Expression {
+	args := []ast.Expression{}
+
+	// 当前 token 为 "("
+
+	p.nextToken()
+
+	// 参数列表有可能为空
+	for !p.curTokenIs(token.RPAREN) {
+		arg := p.parseExpression(LOWEST)
+		args = append(args, arg)
+
+		p.nextToken()
+
+		if p.curTokenIs(token.COMMA) {
+			p.nextToken()
+		}
+	}
+
+	// 当前处于 ")"
+	return args
 }
