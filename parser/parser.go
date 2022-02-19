@@ -108,6 +108,8 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.TRUE, p.parseBooleanLiteral)
 	p.registerPrefix(token.FALSE, p.parseBooleanLiteral)
 
+	p.registerPrefix(token.LPAREN, p.parseGroupedExpression)
+
 	// 注册一元操作符解析过程
 	p.registerPrefix(token.BANG, p.parsePrefixExpression)
 	p.registerPrefix(token.MINUS, p.parsePrefixExpression)
@@ -368,6 +370,18 @@ func (p *Parser) parseBooleanLiteral() ast.Expression {
 
 	literal.Value = p.curTokenIs(token.TRUE) // 因为只有 token.TRUE 和 token.FALSE 两种情况
 	return literal
+}
+
+func (p *Parser) parseGroupedExpression() ast.Expression {
+	p.nextToken()
+
+	expression := p.parseExpression(LOWEST)
+
+	if !p.expectPeek(token.RPAREN) {
+		return nil
+	}
+
+	return expression
 }
 
 func (p *Parser) noPrefixParseFnError(t token.TokenType) {

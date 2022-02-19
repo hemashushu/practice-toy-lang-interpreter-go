@@ -112,7 +112,7 @@ func (rs *ReturnStatement) String() string {
 }
 
 type ExpressionStatement struct {
-	Token      token.Token
+	Token      token.Token // 语句开始的第一个 token
 	Expression Expression
 }
 
