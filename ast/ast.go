@@ -154,7 +154,7 @@ func (il *IntegerLiteral) String() string       { return il.Token.Literal }
 
 // 一元运算符
 type PrefixExpression struct {
-	Token    token.Token // The prefix token, e.g. !, -, +
+	Token    token.Token // 运算符, e.g. !, -, +
 	Operator string      // 运算符的符号
 	Right    Expression
 }
@@ -166,6 +166,26 @@ func (pe *PrefixExpression) String() string {
 	var out bytes.Buffer
 	out.WriteString("(")
 	out.WriteString(pe.Operator)
+	out.WriteString(pe.Right.String())
+	out.WriteString(")")
+	return out.String()
+}
+
+type InfixExpression struct {
+	Token    token.Token // 运算符 token, e.g. + - * / > < == !=
+	Operator string      // 运算符的符号
+	Left     Expression
+	Right    Expression
+}
+
+func (pe *InfixExpression) expressionNode()      {}
+func (pe *InfixExpression) TokenLiteral() string { return pe.Token.Literal }
+
+func (pe *InfixExpression) String() string {
+	var out bytes.Buffer
+	out.WriteString("(")
+	out.WriteString(pe.Left.String())
+	out.WriteString(" " + pe.Operator + " ")
 	out.WriteString(pe.Right.String())
 	out.WriteString(")")
 	return out.String()
