@@ -14,6 +14,8 @@ import (
 const (
 	_           int = iota
 	LOWEST          // 最低优先级，比如从 “语句” 进来的 "表达式" 解析阶段。
+	LOGICOR         // ||
+	LOGICAND        // &&
 	EQUALS          // ==
 	LESSGREATER     // > or <
 	SUM             // +
@@ -25,6 +27,9 @@ const (
 
 // 各个运算符 token 对应的优先级
 var precedences = map[token.TokenType]int{
+	token.AND: LOGICAND, // &&
+	token.OR:  LOGICOR,  // ||
+
 	token.EQ:     EQUALS, // ==
 	token.NOT_EQ: EQUALS, // "!="
 
@@ -128,7 +133,11 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(token.NOT_EQ, p.parseInfixExpression)   // "!="
 	p.registerInfix(token.LT, p.parseInfixExpression)       // <
 	p.registerInfix(token.GT, p.parseInfixExpression)       // >
-	p.registerInfix(token.LPAREN, p.parseCallExpression)
+
+	p.registerInfix(token.AND, p.parseInfixExpression) // &&
+	p.registerInfix(token.OR, p.parseInfixExpression)  // ||
+
+	//p.registerInfix(token.LPAREN, p.parseCallExpression)
 
 	return p
 }

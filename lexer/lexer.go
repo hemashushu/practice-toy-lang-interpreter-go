@@ -85,6 +85,22 @@ func (lx *Lexer) NextToken() token.Token {
 		// 所以手动指定 tk 的值。
 		tk = token.Token{Type: token.EOF, Literal: ""}
 
+	case '&':
+		if lx.peekChar() == '&' {
+			lx.readChar()
+			tk = token.Token{Type: token.AND, Literal: "&&"}
+		} else {
+			tk = newToken(token.ILLEGAL, lx.ch) // 不明字符
+		}
+
+	case '|':
+		if lx.peekChar() == '|' {
+			lx.readChar()
+			tk = token.Token{Type: token.OR, Literal: "||"}
+		} else {
+			tk = newToken(token.ILLEGAL, lx.ch) // 不明字符
+		}
+
 	default:
 		if isAlphabet(lx.ch) {
 			s := lx.readIdentifier()

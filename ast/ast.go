@@ -43,6 +43,7 @@ func (p *Program) String() string {
 	var out bytes.Buffer
 	for _, s := range p.Statements {
 		out.WriteString(s.String())
+		// out.WriteString("\n")
 	}
 
 	return out.String()
@@ -219,9 +220,11 @@ func (bs *BlockStatement) String() string {
 	var out bytes.Buffer
 
 	out.WriteString("{")
+	// out.WriteString("\n")
 
 	for _, s := range bs.Statements {
 		out.WriteString(s.String())
+		// out.WriteString("\n")
 	}
 
 	out.WriteString("}")

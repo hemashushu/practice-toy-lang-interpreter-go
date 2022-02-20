@@ -6,7 +6,7 @@ import (
 	"bufio"
 	"fmt"
 	"interpreter/lexer"
-	"interpreter/token"
+	"interpreter/parser"
 	"io"
 )
 
@@ -23,10 +23,28 @@ func Start(in io.Reader, out io.Writer) {
 		}
 
 		line := scanner.Text()
-		lx := lexer.New(line)
+		l := lexer.New(line)
 
-		for tk := lx.NextToken(); tk.Type != token.EOF; tk = lx.NextToken() {
-			fmt.Printf("%+v\n", tk) // %+v 比 %v 多显示结构体的字段名称
+		// for tk := l.NextToken(); tk.Type != token.EOF; tk = l.NextToken() {
+		// 	fmt.Printf("%+v\n", tk) // %+v 比 %v 多显示结构体的字段名称
+		// }
+
+		p := parser.New(l)
+
+		program := p.ParseProgram()
+		if len(p.Errors()) != 0 {
+			printParserErrors(out, p.Errors())
+			continue
 		}
+
+		io.WriteString(out, program.String())
+		io.WriteString(out, "\n")
+	}
+}
+
+func printParserErrors(out io.Writer, errors []string) {
+	io.WriteString(out, "parser errors:\n")
+	for _, msg := range errors {
+		io.WriteString(out, "\t"+msg+"\n")
 	}
 }
