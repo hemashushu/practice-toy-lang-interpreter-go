@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// AST 节点，包括语句 Statement 和表达式 Expression 两大类
 type Node interface {
 	// 节点/token 的原始值（字符串），仅用于调试、测试
 	// 具体的节点，比如 literal 有对应的值，比如 IntegerLiteral 对应的是一个整数

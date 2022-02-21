@@ -20,7 +20,7 @@ const (
 	LESSGREATER     // > or <
 	SUM             // +
 	PRODUCT         // *
-	PREFIX          // -X or !X
+	PREFIX          // -X, +X or !X
 
 	// CALL            // myFunction(X)
 )
@@ -123,6 +123,7 @@ func New(l *lexer.Lexer) *Parser {
 	// 注册一元操作符解析过程
 	p.registerPrefix(token.BANG, p.parsePrefixExpression)
 	p.registerPrefix(token.MINUS, p.parsePrefixExpression)
+	p.registerPrefix(token.PLUS, p.parsePrefixExpression)
 
 	// 注册二元操作符解析过程
 	p.registerInfix(token.PLUS, p.parseInfixExpression)     // +
