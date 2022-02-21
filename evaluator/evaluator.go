@@ -3,6 +3,7 @@
 package evaluator
 
 import (
+	"fmt"
 	"interpreter/ast"
 	"interpreter/object"
 )
@@ -28,16 +29,28 @@ func Eval(node ast.Node) object.Object {
 
 	case *ast.ReturnStatement:
 		val := Eval(n.ReturnValue)
+		if isError(val) {
+			return val
+		}
 		return &object.ReturnValue{Value: val} // 包裹待返回的 Object
 
 	// 对表达式求值
 	case *ast.PrefixExpression:
 		right := Eval(n.Right)
+		if isError(right) {
+			return right
+		}
 		return evalPrefixExpression(n.Operator, right)
 
 	case *ast.InfixExpression:
 		left := Eval(n.Left)
+		if isError(left) {
+			return left
+		}
 		right := Eval(n.Right)
+		if isError(right) {
+			return right
+		}
 		return evalInfixExpression(n.Operator, left, right)
 
 	case *ast.IfExpression:
@@ -72,10 +85,18 @@ func evalProgram(program *ast.Program) object.Object {
 	for _, statement := range program.Statements {
 		result = Eval(statement)
 
-		if returnValue, ok := result.(*object.ReturnValue); ok {
-			return returnValue.Value
+		// if returnValue, ok := result.(*object.ReturnValue); ok {
+		// 	return returnValue.Value
+		// }
+
+		switch r := result.(type) {
+		case *object.ReturnValue: // 拆封 ReturnValue，并跳过剩余的语句
+			return r.Value
+		case *object.Error: // 返回 Error，并跳过剩余的语句
+			return r
 		}
 	}
+
 	return result
 }
 
@@ -92,8 +113,14 @@ func evalBlockStatement(block *ast.BlockStatement) object.Object {
 
 		// 因为 BlockStatement 可以嵌套，所以暂时不拆封 ReturnValue
 		// 直到 Program 或者 函数字面量 才解封
-		if result != nil && result.Type() == object.RETURN_VALUE_OBJ {
-			return result
+		if result != nil {
+			if result.Type() == object.RETURN_VALUE_OBJ {
+				return result // 跳过剩余的语句
+			}
+
+			if result.Type() == object.ERROR_OBJ {
+				return result // 跳过剩余的语句
+			}
 		}
 	}
 
@@ -110,24 +137,12 @@ func evalPrefixExpression(operator string, right object.Object) object.Object {
 	case "-":
 		return evalMinusPrefixOperatorExpression(right)
 	default:
-		return NULL
+		// return NULL
+		return newError("unknown operator: %s%s", operator, right.Type())
 	}
 }
 
 func evalBangOperatorExpression(right object.Object) object.Object {
-
-	/*
-		// 对于数字，0 视为 false，非 0 视为 true
-		if right.Type() == object.INTEGER_OBJ {
-			value := right.(*object.Integer).Value
-			if value == 0 {
-				return TRUE
-			} else {
-				return FALSE
-			}
-		}
-	*/
-
 	switch right {
 	case TRUE:
 		return FALSE
@@ -142,7 +157,8 @@ func evalBangOperatorExpression(right object.Object) object.Object {
 
 func evalMinusPrefixOperatorExpression(right object.Object) object.Object {
 	if right.Type() != object.INTEGER_OBJ {
-		return NULL // note:: 可返回错误
+		// return NULL
+		return newError("unknown operator: -%s", right.Type())
 	}
 
 	value := right.(*object.Integer).Value
@@ -151,7 +167,8 @@ func evalMinusPrefixOperatorExpression(right object.Object) object.Object {
 
 func evalPlusPrefixOperatorExpression(right object.Object) object.Object {
 	if right.Type() != object.INTEGER_OBJ {
-		return NULL // note:: 可返回错误
+		// return NULL
+		return newError("unknown operator: +%s", right.Type())
 	}
 
 	return right
@@ -169,6 +186,9 @@ func evalInfixExpression(operator string, left object.Object, right object.Objec
 	case operator == "!=":
 		return nativeBoolToBooleanObject(left != right)
 
+	case left.Type() != right.Type():
+		return newError("type mismatch: %s %s %s", left.Type(), operator, right.Type())
+
 	case operator == "&&":
 		return nativeBoolToBooleanObject(
 			left.(*object.Boolean).Value &&
@@ -178,8 +198,10 @@ func evalInfixExpression(operator string, left object.Object, right object.Objec
 		return nativeBoolToBooleanObject(
 			left.(*object.Boolean).Value ||
 				right.(*object.Boolean).Value)
+
 	default:
-		return NULL // note:: 可返回错误
+		// return NULL
+		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
 	}
 }
 
@@ -208,12 +230,17 @@ func evalIntegerInfixExpression(operator string, left object.Object, right objec
 		return nativeBoolToBooleanObject(leftValue != rightValue)
 
 	default:
-		return NULL // note:: 可返回错误
+		// return NULL
+		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
 	}
 }
 
 func evalIfExpression(expression *ast.IfExpression) object.Object {
 	condition := Eval(expression.Condition)
+
+	if isError(condition) {
+		return condition
+	}
 
 	if isTruthy(condition) {
 		return Eval(expression.Consequence)
@@ -236,5 +263,20 @@ func isTruthy(obj object.Object) bool {
 		return true
 	default:
 		return true
+	}
+}
+
+func newError(format string, a ...interface{}) *object.Error {
+	return &object.Error{Message: fmt.Sprintf(format, a...)}
+}
+
+// 用在 "调用 Eval(...) 之后还需进一步执行其他运算" 的场合，用于提早返回
+// 比如在调用 evalInfixExpression 之前需要先对 left node 和 right node
+// 求值，如果任意一个返回 Error，都应该提前返回 Error，而不是继续执行 evalInfixExpression
+func isError(obj object.Object) bool {
+	if obj != nil {
+		return obj.Type() == object.ERROR_OBJ
+	} else {
+		return false
 	}
 }
