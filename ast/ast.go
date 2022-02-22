@@ -220,7 +220,7 @@ func (bs *BlockStatement) TokenLiteral() string { return bs.Token.Literal }
 func (bs *BlockStatement) String() string {
 	var out bytes.Buffer
 
-	out.WriteString("{")
+	// out.WriteString("{")
 	// out.WriteString("\n")
 
 	for _, s := range bs.Statements {
@@ -228,7 +228,7 @@ func (bs *BlockStatement) String() string {
 		// out.WriteString("\n")
 	}
 
-	out.WriteString("}")
+	// out.WriteString("}")
 
 	return out.String()
 }

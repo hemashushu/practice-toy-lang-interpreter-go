@@ -34,6 +34,13 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		}
 		return &object.ReturnValue{Value: val} // 包裹待返回的 Object
 
+	case *ast.LetStatement:
+		val := Eval(n.Value, env)
+		if isError(val) {
+			return val
+		}
+		env.Set(n.Name.Value, val)
+
 	// 对表达式求值
 	case *ast.PrefixExpression:
 		right := Eval(n.Right, env)
@@ -56,7 +63,41 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 	case *ast.IfExpression:
 		return evalIfExpression(n, env)
 
+	case *ast.FunctionLiteral:
+		params := n.Parameters
+		body := n.Body
+		return &object.Function{Parameters: params, Body: body, Env: env}
+
+	case *ast.CallExpression:
+		function := Eval(n.Function, env)
+		if isError(function) {
+			return function
+		}
+
+		// 先对每个实参求值
+		args := evalExpressions(n.Arguments, env)
+
+		// for _, arg := range args {
+		// 	if isError(arg) {
+		// 		return arg
+		// 	}
+		// }
+
+		// 在上一步骤，如果有其中一个参数求值出错，则返回
+		// 单一个元素的 []object.Object，所以不需要逐个参数值检查
+		if len(args) == 1 && isError(args[0]) {
+			return args[0]
+		}
+
+		return applyFunction(function, args)
+
 	// 对标识符求值
+	case *ast.Identifier:
+		val, ok := env.Get(n.Value)
+		if !ok {
+			return newError("identifier not found: " + n.Value)
+		}
+		return val
 
 	// 对字面量求值
 	case *ast.IntegerLiteral:
@@ -279,4 +320,52 @@ func isError(obj object.Object) bool {
 	} else {
 		return false
 	}
+}
+
+func evalExpressions(
+	expressions []ast.Expression,
+	env *object.Environment) []object.Object {
+	var result []object.Object
+
+	for _, e := range expressions {
+		evaluated := Eval(e, env)
+		if isError(evaluated) {
+			return []object.Object{evaluated}
+		}
+		result = append(result, evaluated)
+	}
+
+	return result
+}
+
+func applyFunction(fn object.Object, args []object.Object) object.Object {
+	function, ok := fn.(*object.Function)
+	if !ok {
+		return newError("not a function: %s", fn.Type())
+	}
+
+	// 为函数的求值创造一个新的环境，该环境的上层环境为 "函数定义时" 的环境
+	// 即静态范围(static scope)
+	extendedEnv := extendFunctionEnv(function, args)
+	evaluated := Eval(function.Body, extendedEnv)
+	return unwrapReturnValue(evaluated)
+}
+
+func extendFunctionEnv(fn *object.Function, args []object.Object) *object.Environment {
+	env := object.NewEnclosedEnvironment(fn.Env)
+
+	// 用实参填充每一个形参
+	for paramIdx, param := range fn.Parameters {
+		env.Set(param.Value, args[paramIdx])
+	}
+
+	return env
+}
+
+// 拆封函数里 return 语句所包装的值（即 object.Return）给函数调用者
+func unwrapReturnValue(obj object.Object) object.Object {
+	if returnValue, ok := obj.(*object.ReturnValue); ok {
+		return returnValue.Value
+	}
+	return obj
 }

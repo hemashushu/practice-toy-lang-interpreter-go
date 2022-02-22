@@ -242,10 +242,10 @@ func TestErrorHandling(t *testing.T) {
 		},
 
 		// 不存在的标识符
-		// {
-		// 	"foobar",
-		// 	"identifier not found: foobar",
-		// },
+		{
+			"foobar",
+			"identifier not found: foobar",
+		},
 	}
 	for idx, test := range tests {
 		evaluated := testEval(test.input)
@@ -264,18 +264,70 @@ func TestErrorHandling(t *testing.T) {
 	}
 }
 
-// func TestLetStatements(t *testing.T) {
-// 	tests := []struct {
-// 		input    string
-// 		expected int64
-// 	}{
-// 		{"let a = 5; a;", 5},
-// 		{"let a = 5 * 5; a;", 25},
-// 		{"let a = 5; let b = a; b;", 5},
-// 		{"let a = 5; let b = a; let c = a + b + 5; c;", 15},
-// 	}
-//
-// 	for _, test := range tests {
-// 		testIntegerObject(t, testEval(test.input), test.expected)
-// 	}
-// }
+func TestLetStatements(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int64
+	}{
+		{"let a = 5; a;", 5},
+		{"let a = 5 * 5; a;", 25},
+		{"let a = 5; let b = a; b;", 5},
+		{"let a = 5; let b = a; let c = a + b + 5; c;", 15},
+	}
+
+	for _, test := range tests {
+		testIntegerObject(t, testEval(test.input), test.expected)
+	}
+}
+
+func TestFunctionObject(t *testing.T) {
+	input := "fn(x) { x + 2; };"
+	evaluated := testEval(input)
+
+	fn, ok := evaluated.(*object.Function)
+	if !ok {
+		t.Fatalf("expected Function, actual %T %+v", evaluated, evaluated)
+	}
+
+	if len(fn.Parameters) != 1 {
+		t.Fatalf("expected 1 parameter, actual %+v",
+			fn.Parameters)
+	}
+
+	if fn.Parameters[0].String() != "x" {
+		t.Fatalf("expected parameter 'x', actual %q", fn.Parameters[0])
+	}
+
+	expectedBody := "(x + 2)"
+	if fn.Body.String() != expectedBody {
+		t.Fatalf("expected body %q, actual %q", expectedBody, fn.Body.String())
+	}
+}
+
+func TestFunctionApplication(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int64
+	}{
+		{"let identity = fn(x) { x; }; identity(5);", 5},
+		{"let identity = fn(x) { return x; }; identity(5);", 5},
+		{"let double = fn(x) { x * 2; }; double(5);", 10},
+		{"let add = fn(x, y) { x + y; }; add(5, 5);", 10},
+		{"let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", 20},
+		{"fn(x) { x; }(5)", 5},
+	}
+
+	for _, test := range tests {
+		testIntegerObject(t, testEval(test.input), test.expected)
+	}
+}
+
+func TestClosures(t *testing.T) {
+	input := `
+	let newAdder = fn(x) {
+		fn(y) { x + y };
+	};
+	let addTwo = newAdder(2);
+	addTwo(2);`
+	testIntegerObject(t, testEval(input), 4)
+}
