@@ -3,7 +3,6 @@
 package lexer
 
 import (
-	"fmt"
 	"interpreter/token"
 	"testing"
 )
@@ -135,8 +134,39 @@ func TestNextToken3(t *testing.T) {
 
 	lx := New(input)
 
-	// $ go test ./lexer -v
 	for tk := lx.NextToken(); tk.Type != token.EOF; tk = lx.NextToken() {
-		fmt.Println(tk)
+		// uncomment to check the output
+		// fmt.Println(tk)
+	}
+}
+
+func TestNextToken4(t *testing.T) {
+	input := `
+	"foobar"
+	"foo bar"
+	`
+	tests := []struct {
+		expectedType    token.TokenType
+		expectedLiteral string
+	}{
+		{token.STRING, "foobar"},
+		{token.STRING, "foo bar"},
+		{token.EOF, ""},
+	}
+
+	lx := New(input)
+
+	for i, test := range tests {
+		tk := lx.NextToken()
+
+		if tk.Type != test.expectedType {
+			t.Fatalf("tests [%d] - token type wrong. expected %q, actual %q",
+				i, test.expectedType, tk.Type)
+		}
+
+		if tk.Literal != test.expectedLiteral {
+			t.Fatalf("tests [%d] - token value wrong. expected %q, actual %q",
+				i, test.expectedLiteral, tk.Literal)
+		}
 	}
 }

@@ -106,6 +106,8 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 	case *ast.Boolean:
 		return nativeBoolToBooleanObject(n.Value)
 
+	case *ast.StringLiteral:
+		return &object.String{Value: n.Value}
 	}
 
 	return nil
@@ -221,6 +223,10 @@ func evalInfixExpression(operator string, left object.Object, right object.Objec
 		right.Type() == object.INTEGER_OBJ:
 		return evalIntegerInfixExpression(operator, left, right)
 
+	case left.Type() == object.STRING_OBJ &&
+		right.Type() == object.STRING_OBJ:
+		return evalStringInfixExpression(operator, left, right)
+
 	case operator == "==":
 		return nativeBoolToBooleanObject(left == right)
 
@@ -272,6 +278,17 @@ func evalIntegerInfixExpression(operator string, left object.Object, right objec
 
 	default:
 		// return NULL
+		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
+	}
+}
+
+func evalStringInfixExpression(operator string, left object.Object, right object.Object) object.Object {
+	leftValue := left.(*object.String).Value
+	rightValue := right.(*object.String).Value
+
+	if operator == "+" {
+		return &object.String{Value: leftValue + rightValue}
+	} else {
 		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
 	}
 }

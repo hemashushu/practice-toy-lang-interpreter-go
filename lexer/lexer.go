@@ -80,10 +80,6 @@ func (lx *Lexer) NextToken() token.Token {
 		tk = newToken(token.LBRACE, lx.ch)
 	case '}':
 		tk = newToken(token.RBRACE, lx.ch)
-	case 0:
-		// 无法通过调用 newToken() 函数来构造 Literal 值为空字符串的 Token 对象，
-		// 所以手动指定 tk 的值。
-		tk = token.Token{Type: token.EOF, Literal: ""}
 
 	case '&':
 		if lx.peekChar() == '&' {
@@ -100,6 +96,16 @@ func (lx *Lexer) NextToken() token.Token {
 		} else {
 			tk = newToken(token.ILLEGAL, lx.ch) // 不明字符
 		}
+
+	case '"':
+		tk.Type = token.STRING
+		tk.Literal = lx.readString()
+
+	case 0:
+		// 到达文件末尾。
+		// 无法通过调用 newToken() 函数来构造 Literal 值为空字符串的 Token 对象，
+		// 所以手动指定 tk 的值。
+		tk = token.Token{Type: token.EOF, Literal: ""}
 
 	default:
 		if isAlphabet(lx.ch) {
@@ -162,6 +168,19 @@ func (lx *Lexer) readNumber() string { // 以字符串的形式返回数字
 
 	// 返回从 startPosition 到 lx.position 之间的字符
 	return lx.input[startPosition:lx.position]
+}
+
+func (lx *Lexer) readString() string { // 返回的字符串值不包含前后双引号
+	startPosition := lx.position
+	for {
+		lx.readChar() // 读下一个字符
+		if lx.ch == '"' || lx.ch == 0 {
+			break
+		}
+	}
+
+	// 返回从 startPosition + 1 到 lx.position 之间的字符
+	return lx.input[startPosition+1 : lx.position]
 }
 
 func isAlphabet(ch byte) bool {

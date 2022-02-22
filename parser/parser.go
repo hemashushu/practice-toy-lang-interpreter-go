@@ -115,6 +115,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.INT, p.parseIntegerLiteral)
 	p.registerPrefix(token.TRUE, p.parseBooleanLiteral)
 	p.registerPrefix(token.FALSE, p.parseBooleanLiteral)
+	p.registerPrefix(token.STRING, p.parseStringLiteral)
 
 	p.registerPrefix(token.LPAREN, p.parseGroupedExpression)    // 表达式括号
 	p.registerPrefix(token.IF, p.parseIfExpression)             // 当前 toy lang 里，if 是表达式（而不是语句）
@@ -422,6 +423,15 @@ func (p *Parser) parseBooleanLiteral() ast.Expression {
 	//literal.Value = value
 
 	literal.Value = p.curTokenIs(token.TRUE) // 因为只有 token.TRUE 和 token.FALSE 两种情况
+	return literal
+}
+
+func (p *Parser) parseStringLiteral() ast.Expression {
+	literal := &ast.StringLiteral{
+		Token: p.curToken,
+		Value: p.curToken.Literal,
+	}
+
 	return literal
 }
 

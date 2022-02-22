@@ -15,6 +15,7 @@ type ObjectType string
 const (
 	INTEGER_OBJ      = "INTEGER"
 	BOOLEAN_OBJ      = "BOOLEAN"
+	STRING_OBJ       = "STRING"
 	NULL_OBJ         = "NULL"
 	RETURN_VALUE_OBJ = "RETURN_VALUE" // 包裹其他 Object 的 Object，用于 return 语句
 	ERROR_OBJ        = "ERROR"
@@ -61,6 +62,13 @@ func (n *Null) Type() ObjectType {
 func (n *Null) Inspect() string {
 	return "null"
 }
+
+type String struct {
+	Value string
+}
+
+func (s *String) Type() ObjectType { return STRING_OBJ }
+func (s *String) Inspect() string  { return s.Value }
 
 // 包裹其他 Object 的 Object，用于 return 语句
 type ReturnValue struct {

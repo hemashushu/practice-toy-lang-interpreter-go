@@ -246,6 +246,12 @@ func TestErrorHandling(t *testing.T) {
 			"foobar",
 			"identifier not found: foobar",
 		},
+
+		// 字符串运算
+		{
+			`"Hello" - "World"`,
+			"unknown operator: STRING - STRING",
+		},
 	}
 	for idx, test := range tests {
 		evaluated := testEval(test.input)
@@ -330,4 +336,32 @@ func TestClosures(t *testing.T) {
 	let addTwo = newAdder(2);
 	addTwo(2);`
 	testIntegerObject(t, testEval(input), 4)
+}
+
+func TestStringLiteral(t *testing.T) {
+	input := `"Hello World!"`
+	evaluated := testEval(input)
+
+	str, ok := evaluated.(*object.String)
+	if !ok {
+		t.Fatalf("expected String, actual %T, %+v", evaluated, evaluated)
+	}
+
+	if str.Value != "Hello World!" {
+		t.Errorf("expected %q, actual %q", "Hello World!", str.Value)
+	}
+}
+
+func TestStringConcatenation(t *testing.T) {
+	input := `"Hello" + " " + "World!"`
+	evaluated := testEval(input)
+
+	str, ok := evaluated.(*object.String)
+	if !ok {
+		t.Fatalf("expected String, actual %T, %+v", evaluated, evaluated)
+	}
+
+	if str.Value != "Hello World!" {
+		t.Errorf("expected %q, actual %q", "Hello World!", str.Value)
+	}
 }

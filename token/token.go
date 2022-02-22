@@ -15,8 +15,9 @@ const (
 	EOF     = "EOF"     // 这个是当源码到达末尾时，nextToken() 函数返回的值
 
 	// 标识符和字面值
-	IDENT = "IDENT" // add, foobar, x, y, ...
-	INT   = "INT"   // 1343456
+	IDENT  = "IDENT"  // add, foobar, x, y, ...
+	INT    = "INT"    // 1343456
+	STRING = "STRING" // "foobar"
 
 	// 操作符
 	ASSIGN   = "="
