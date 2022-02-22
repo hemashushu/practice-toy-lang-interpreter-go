@@ -14,21 +14,21 @@ var (
 	NULL  = &object.Null{}
 )
 
-func Eval(node ast.Node) object.Object {
+func Eval(node ast.Node, env *object.Environment) object.Object {
 	switch n := node.(type) {
 
 	// 对语句求值
 	case *ast.Program:
-		return evalProgram(n)
+		return evalProgram(n, env)
 
 	case *ast.BlockStatement:
-		return evalBlockStatement(n)
+		return evalBlockStatement(n, env)
 
 	case *ast.ExpressionStatement:
-		return Eval(n.Expression)
+		return Eval(n.Expression, env)
 
 	case *ast.ReturnStatement:
-		val := Eval(n.ReturnValue)
+		val := Eval(n.ReturnValue, env)
 		if isError(val) {
 			return val
 		}
@@ -36,25 +36,25 @@ func Eval(node ast.Node) object.Object {
 
 	// 对表达式求值
 	case *ast.PrefixExpression:
-		right := Eval(n.Right)
+		right := Eval(n.Right, env)
 		if isError(right) {
 			return right
 		}
 		return evalPrefixExpression(n.Operator, right)
 
 	case *ast.InfixExpression:
-		left := Eval(n.Left)
+		left := Eval(n.Left, env)
 		if isError(left) {
 			return left
 		}
-		right := Eval(n.Right)
+		right := Eval(n.Right, env)
 		if isError(right) {
 			return right
 		}
 		return evalInfixExpression(n.Operator, left, right)
 
 	case *ast.IfExpression:
-		return evalIfExpression(n)
+		return evalIfExpression(n, env)
 
 	// 对标识符求值
 
@@ -78,12 +78,12 @@ func nativeBoolToBooleanObject(input bool) *object.Boolean {
 	}
 }
 
-func evalProgram(program *ast.Program) object.Object {
+func evalProgram(program *ast.Program, env *object.Environment) object.Object {
 	// evalProgram 跟 evalBlockStatement 很相似，但 BlockStatement 可以嵌套，当遇到
 	// return 语句时，需要跳到最外一层 block，所以无法重用 evalBlockStatement
 	var result object.Object
 	for _, statement := range program.Statements {
-		result = Eval(statement)
+		result = Eval(statement, env)
 
 		// if returnValue, ok := result.(*object.ReturnValue); ok {
 		// 	return returnValue.Value
@@ -100,11 +100,11 @@ func evalProgram(program *ast.Program) object.Object {
 	return result
 }
 
-func evalBlockStatement(block *ast.BlockStatement) object.Object {
+func evalBlockStatement(block *ast.BlockStatement, env *object.Environment) object.Object {
 	var result object.Object
 
 	for _, statement := range block.Statements {
-		result = Eval(statement)
+		result = Eval(statement, env)
 
 		// 在一组语句中，存在 return 语句
 		// if returnValue, ok := result.(*object.ReturnValue); ok {
@@ -235,17 +235,17 @@ func evalIntegerInfixExpression(operator string, left object.Object, right objec
 	}
 }
 
-func evalIfExpression(expression *ast.IfExpression) object.Object {
-	condition := Eval(expression.Condition)
+func evalIfExpression(expression *ast.IfExpression, env *object.Environment) object.Object {
+	condition := Eval(expression.Condition, env)
 
 	if isError(condition) {
 		return condition
 	}
 
 	if isTruthy(condition) {
-		return Eval(expression.Consequence)
+		return Eval(expression.Consequence, env)
 	} else if expression.Alternative != nil {
-		return Eval(expression.Alternative)
+		return Eval(expression.Alternative, env)
 	} else {
 		// Alternative 被选中但它不存在的情况，返回 NULL
 		return NULL
