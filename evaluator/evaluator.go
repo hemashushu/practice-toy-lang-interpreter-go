@@ -93,11 +93,12 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 
 	// 对标识符求值
 	case *ast.Identifier:
-		val, ok := env.Get(n.Value)
-		if !ok {
-			return newError("identifier not found: " + n.Value)
-		}
-		return val
+		// val, ok := env.Get(n.Value)
+		// if !ok {
+		// 	return newError("identifier not found: " + n.Value)
+		// }
+		// return val
+		return evalIdentifier(n, env)
 
 	// 对字面量求值
 	case *ast.IntegerLiteral:
@@ -111,6 +112,18 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 	}
 
 	return nil
+}
+
+func evalIdentifier(node *ast.Identifier, env *object.Environment) object.Object {
+	if val, ok := env.Get(node.Value); ok {
+		return val
+	}
+
+	if builtin, ok := builtins[node.Value]; ok {
+		return builtin
+	}
+
+	return newError("identifier not found: " + node.Value)
 }
 
 func nativeBoolToBooleanObject(input bool) *object.Boolean {
@@ -356,16 +369,25 @@ func evalExpressions(
 }
 
 func applyFunction(fn object.Object, args []object.Object) object.Object {
-	function, ok := fn.(*object.Function)
-	if !ok {
+	// function, ok := fn.(*object.Function)
+	// if !ok {
+	// 	return newError("not a function: %s", fn.Type())
+	// }
+
+	switch f := fn.(type) {
+	case *object.Function:
+		// 为函数的求值创造一个新的环境，该环境的上层环境为 "函数定义时" 的环境
+		// 即静态范围(static scope)
+		extendedEnv := extendFunctionEnv(f, args)
+		evaluated := Eval(f.Body, extendedEnv)
+		return unwrapReturnValue(evaluated)
+
+	case *object.Builtin:
+		return f.Fn(args...)
+
+	default:
 		return newError("not a function: %s", fn.Type())
 	}
-
-	// 为函数的求值创造一个新的环境，该环境的上层环境为 "函数定义时" 的环境
-	// 即静态范围(static scope)
-	extendedEnv := extendFunctionEnv(function, args)
-	evaluated := Eval(function.Body, extendedEnv)
-	return unwrapReturnValue(evaluated)
 }
 
 func extendFunctionEnv(fn *object.Function, args []object.Object) *object.Environment {
