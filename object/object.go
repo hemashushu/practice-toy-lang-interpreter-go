@@ -20,8 +20,8 @@ const (
 	RETURN_VALUE_OBJ = "RETURN_VALUE" // 包裹其他 Object 的 Object，用于 return 语句
 	ERROR_OBJ        = "ERROR"
 	FUNCTION_OBJ     = "FUNCTION"
-
-	BUILTIN_OBJ = "BUILTIN" // 内置函数
+	BUILTIN_OBJ      = "BUILTIN" // 内置函数
+	ARRAY_OBJ        = "ARRAY"
 )
 
 type Object interface {
@@ -121,3 +121,20 @@ type Builtin struct {
 
 func (b *Builtin) Type() ObjectType { return BUILTIN_OBJ }
 func (b *Builtin) Inspect() string  { return "builtin function" }
+
+type Array struct {
+	Elements []Object
+}
+
+func (ao *Array) Type() ObjectType { return ARRAY_OBJ }
+func (ao *Array) Inspect() string {
+	var out bytes.Buffer
+	elements := []string{}
+	for _, element := range ao.Elements {
+		elements = append(elements, element.Inspect())
+	}
+	out.WriteString("[")
+	out.WriteString(strings.Join(elements, ", "))
+	out.WriteString("]")
+	return out.String()
+}

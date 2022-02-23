@@ -69,17 +69,23 @@ func (lx *Lexer) NextToken() token.Token {
 
 	case ';':
 		tk = newToken(token.SEMICOLON, lx.ch)
+	case ',':
+		tk = newToken(token.COMMA, lx.ch)
+
 	case '(':
 		tk = newToken(token.LPAREN, lx.ch)
 	case ')':
 		tk = newToken(token.RPAREN, lx.ch)
-	case ',':
-		tk = newToken(token.COMMA, lx.ch)
 
 	case '{':
 		tk = newToken(token.LBRACE, lx.ch)
 	case '}':
 		tk = newToken(token.RBRACE, lx.ch)
+
+	case '[':
+		tk = newToken(token.LBRACKET, lx.ch)
+	case ']':
+		tk = newToken(token.RBRACKET, lx.ch)
 
 	case '&':
 		if lx.peekChar() == '&' {

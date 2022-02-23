@@ -374,7 +374,7 @@ func TestBuiltinFunctions(t *testing.T) {
 		{`len("")`, 0},
 		{`len("four")`, 4},
 		{`len("hello world")`, 11},
-		{`len(1)`, "argument to `len` expected STRING, actual INTEGER"},
+		{`len(1)`, "argument type of `len` expected STRING or ARRAY, actual INTEGER"},
 		{`len("one", "two")`, "number of arguments for `len` expected 1, actual 2"},
 	}
 
@@ -396,4 +396,126 @@ func TestBuiltinFunctions(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestArrayLiterals(t *testing.T) {
+	input := "[1, 2 * 2, 3 + 3]"
+	evaluated := testEval(input)
+	result, ok := evaluated.(*object.Array)
+
+	if !ok {
+		t.Fatalf("expected Array, actual %T, %+v", evaluated, evaluated)
+	}
+
+	if len(result.Elements) != 3 {
+		t.Fatalf("expected 3 elements, actual %d",
+			len(result.Elements))
+	}
+
+	testIntegerObject(t, result.Elements[0], 1)
+	testIntegerObject(t, result.Elements[1], 4)
+	testIntegerObject(t, result.Elements[2], 6)
+}
+
+func TestArrayIndexExpressions(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{
+			"[1, 2, 3][0]",
+			1,
+		},
+		{
+			"[1, 2, 3][1]",
+			2,
+		},
+		{
+			"[1, 2, 3][2]",
+			3,
+		},
+		{
+			"let i = 0; [1][i];",
+			1,
+		},
+		{
+			"[1, 2, 3][1 + 1];",
+			3,
+		},
+		{
+			"let myArray = [1, 2, 3]; myArray[2];",
+			3,
+		},
+		{
+			"let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+			6,
+		},
+		{
+			"let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
+			2,
+		},
+		{
+			"[1, 2, 3][3]",
+			nil,
+		},
+		{
+			"[1, 2, 3][-1]",
+			nil,
+		},
+	}
+
+	for _, test := range tests {
+		evaluated := testEval(test.input)
+		integer, ok := test.expected.(int)
+		if ok {
+			testIntegerObject(t, evaluated, int64(integer))
+		} else {
+			testNullObject(t, evaluated)
+		}
+	}
+}
+
+func TestMap(t *testing.T) {
+	input := `
+	let map = fn(arr, f) {
+		let iter = fn(arr, accumulated) {
+			if (len(arr) == 0) {
+				accumulated
+			} else {
+				iter(rest(arr), push(accumulated, f(first(arr))));
+			}
+		};
+		iter(arr, []);
+	};
+	let a = [1, 2, 3, 4];
+	let double = fn(x) { x * 2 };
+	map(a, double);
+	`
+
+	// manual check
+	evaluated := testEval(input)
+	t.Log(evaluated)
+}
+
+func TestReduce(t *testing.T) {
+	input := `
+	let reduce = fn(arr, initial, f) {
+		let iter = fn(arr, result) {
+			if (len(arr) == 0) {
+				result
+			} else {
+				iter(rest(arr), f(result, first(arr)));
+			}
+		};
+		iter(arr, initial);
+	};
+	let sum = fn(arr) {
+		reduce(arr, 0, fn(initial, el) { initial + el });
+	};
+	sum([1, 2, 3, 4, 5]);
+	`
+
+	// manual check
+	evaluated := testEval(input)
+	t.Log(evaluated)
 }

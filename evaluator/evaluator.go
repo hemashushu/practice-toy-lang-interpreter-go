@@ -91,6 +91,20 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 
 		return applyFunction(function, args)
 
+	// 对索引表达式求值
+	case *ast.IndexExpression:
+		left := Eval(n.Left, env)
+		if isError(left) {
+			return left
+		}
+
+		index := Eval(n.Index, env)
+		if isError(index) {
+			return index
+		}
+
+		return evalIndexExpression(left, index)
+
 	// 对标识符求值
 	case *ast.Identifier:
 		// val, ok := env.Get(n.Value)
@@ -109,9 +123,64 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 
 	case *ast.StringLiteral:
 		return &object.String{Value: n.Value}
+
+	case *ast.ArrayLiteral:
+		// objs := []object.Object{}
+		// for _, element := range n.Elements {
+		// 	obj := Eval(element, env)
+		// 	if isError(obj) {
+		// 		return obj
+		// 	}
+		// 	objs = append(objs, obj)
+		// }
+		objs := evalExpressions(n.Elements, env)
+		if len(objs) == 1 && isError(objs[0]) {
+			return objs[0]
+		}
+
+		return &object.Array{
+			Elements: objs,
+		}
 	}
 
 	return nil
+}
+
+func evalIndexExpression(left object.Object, index object.Object) object.Object {
+	// 	array, ok := left.(*object.Array)
+	// 	if !ok {
+	// 		return newError("expected Array")
+	// 	}
+	//
+	// 	i, ok := index.(*object.Integer)
+	// 	if !ok {
+	// 		return newError("expected Integer")
+	// 	}
+	//
+	// 	if i.Value < 0 || i.Value >= int64(len(array.Elements)) {
+	// 		//return newError("out of index")
+	// 		return NULL
+	// 	}
+	// 	fmt.Printf("\nIDX: %+v\n", array.Elements[i.Value])
+	// 	return array.Elements[i.Value]
+
+	switch {
+	case left.Type() == object.ARRAY_OBJ && index.Type() == object.INTEGER_OBJ:
+		return evalArrayIndexExpression(left, index)
+	default:
+		return newError("index operator not supported: %s", left.Type())
+	}
+}
+
+func evalArrayIndexExpression(array, index object.Object) object.Object {
+	arrayObject := array.(*object.Array)
+	idx := index.(*object.Integer).Value
+	max := int64(len(arrayObject.Elements) - 1)
+	if idx < 0 || idx > max {
+		// out of index
+		return NULL
+	}
+	return arrayObject.Elements[idx]
 }
 
 func evalIdentifier(node *ast.Identifier, env *object.Environment) object.Object {
@@ -352,9 +421,12 @@ func isError(obj object.Object) bool {
 	}
 }
 
+// 返回切片 []object.Object，如果其中一个表达式有错误，则返回
+// 单一个元素的切片。
 func evalExpressions(
 	expressions []ast.Expression,
 	env *object.Environment) []object.Object {
+
 	var result []object.Object
 
 	for _, e := range expressions {

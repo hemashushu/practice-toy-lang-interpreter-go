@@ -22,7 +22,8 @@ const (
 	PRODUCT         // *
 	PREFIX          // -X, +X or !X
 
-	// CALL            // myFunction(X)
+	CALL  // myFunction(X)
+	INDEX // array[index]
 )
 
 // 各个运算符 token 对应的优先级
@@ -41,7 +42,8 @@ var precedences = map[token.TokenType]int{
 	token.SLASH:    PRODUCT, // /
 	token.ASTERISK: PRODUCT, // *
 
-	// token.LPAREN: CALL, // (
+	token.LPAREN:   CALL,  // (
+	token.LBRACKET: INDEX, // [
 }
 
 // 解析的顺序按照各种 "语言元素（即语句、表达式等）" 的优先级来进行。
@@ -117,7 +119,9 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.FALSE, p.parseBooleanLiteral)
 	p.registerPrefix(token.STRING, p.parseStringLiteral)
 
-	p.registerPrefix(token.LPAREN, p.parseGroupedExpression)    // 表达式括号
+	p.registerPrefix(token.LPAREN, p.parseGroupedExpression) // 表达式括号
+	p.registerPrefix(token.LBRACKET, p.parseArrayLiteral)    // 数组字面量中括号
+
 	p.registerPrefix(token.IF, p.parseIfExpression)             // 当前 toy lang 里，if 是表达式（而不是语句）
 	p.registerPrefix(token.FUNCTION, p.parseFunctionExpression) // 当前 toy lang 里，fn 是表达式
 
@@ -139,7 +143,9 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(token.AND, p.parseInfixExpression) // &&
 	p.registerInfix(token.OR, p.parseInfixExpression)  // ||
 
-	//p.registerInfix(token.LPAREN, p.parseCallExpression)
+	// 解析函数调用和索引
+	//p.registerInfix(token.LPAREN, p.parseCallExpression // "(...)"
+	//p.registerInfix(token.LBRACKET, p.parseIndexExpression) // "[...]"
 
 	return p
 }
@@ -302,13 +308,16 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 	// p.registerInfix(token.LPAREN, p.parseCallExpression)
 	// ...
 	//
-	// 虽然可行，但觉得有点取巧
-
-	switch leftExp.(type) {
-	case *ast.Identifier, *ast.FunctionLiteral:
+	// 虽然可行，但觉得有点取巧，下面是在解析完 left 之后紧接着判断是否 "(" 和 "[" 等符号
+	for {
 		if p.peekTokenIs(token.LPAREN) {
 			p.nextToken()
-			return p.parseCallExpression(leftExp)
+			leftExp = p.parseCallExpression(leftExp)
+		} else if p.peekTokenIs(token.LBRACKET) {
+			p.nextToken()
+			leftExp = p.parseIndexExpression(leftExp)
+		} else {
+			break
 		}
 	}
 
@@ -446,6 +455,12 @@ func (p *Parser) parseGroupedExpression() ast.Expression {
 	}
 
 	return expression
+}
+
+func (p *Parser) parseArrayLiteral() ast.Expression {
+	array := &ast.ArrayLiteral{Token: p.curToken}
+	array.Elements = p.parseExpressionList(token.RBRACKET)
+	return array
 }
 
 func (p *Parser) noPrefixParseFnError(t token.TokenType) {
@@ -603,6 +618,23 @@ func (p *Parser) parseFunctionParameters() []*ast.Identifier {
 	return identifiers
 }
 
+func (p *Parser) parseIndexExpression(left ast.Expression) ast.Expression {
+	indexExpression := &ast.IndexExpression{
+		Token: p.curToken, // "["
+		Left:  left,
+	}
+
+	p.nextToken() // 消耗 "["
+
+	indexExpression.Index = p.parseExpression(LOWEST)
+
+	if !p.expectPeek(token.RBRACKET) { // 断言并消耗 "]"
+		return nil
+	}
+
+	return indexExpression
+}
+
 // <expression>(<comma separated expressions>)
 // e.g.
 // "add(2, 3)"
@@ -614,29 +646,58 @@ func (p *Parser) parseCallExpression(function ast.Expression) ast.Expression {
 		Token:    p.curToken, // "("
 		Function: function,
 	}
-	expression.Arguments = p.parseCallArguments()
+	// expression.Arguments = p.parseCallArguments()
+	expression.Arguments = p.parseExpressionList(token.RPAREN)
 	return expression
 }
 
-func (p *Parser) parseCallArguments() []ast.Expression {
-	args := []ast.Expression{}
+// func (p *Parser) parseCallArguments() []ast.Expression {
+// 	args := []ast.Expression{}
+//
+// 	// 当前 token 为 "(", token.LPAREN
+//
+// 	p.nextToken()
+//
+// 	// 参数列表有可能为空
+// 	for !p.curTokenIs(token.RPAREN) {
+// 		arg := p.parseExpression(LOWEST)
+// 		args = append(args, arg)
+//
+// 		p.nextToken()
+//
+// 		if p.curTokenIs(token.COMMA) {
+// 			p.nextToken()
+// 		}
+// 	}
+//
+// 	// 当前处于 ")"
+// 	return args
+// }
 
-	// 当前 token 为 "("
+func (p *Parser) parseExpressionList(endTokenType token.TokenType) []ast.Expression {
+	list := []ast.Expression{}
 
-	p.nextToken()
+	// 当前 token 为 startToken，比如 "(" 或者 "["
 
 	// 参数列表有可能为空
-	for !p.curTokenIs(token.RPAREN) {
-		arg := p.parseExpression(LOWEST)
-		args = append(args, arg)
-
+	if p.peekTokenIs(endTokenType) {
 		p.nextToken()
-
-		if p.curTokenIs(token.COMMA) {
-			p.nextToken()
-		}
+		return list
 	}
 
-	// 当前处于 ")"
-	return args
+	p.nextToken()
+	list = append(list, p.parseExpression(LOWEST))
+
+	for p.peekTokenIs(token.COMMA) {
+		p.nextToken()
+		p.nextToken()
+		list = append(list, p.parseExpression(LOWEST))
+	}
+
+	if !p.expectPeek(endTokenType) {
+		return nil
+	}
+
+	// 当前处于 endToken，比如 "(" 或者 "["
+	return list
 }

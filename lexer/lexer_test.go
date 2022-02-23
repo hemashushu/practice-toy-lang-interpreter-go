@@ -170,3 +170,36 @@ func TestNextToken4(t *testing.T) {
 		}
 	}
 }
+
+func TestNextToken5(t *testing.T) {
+	input := `
+	[1, 2]
+	`
+	tests := []struct {
+		expectedType    token.TokenType
+		expectedLiteral string
+	}{
+		{token.LBRACKET, "["},
+		{token.INT, "1"},
+		{token.COMMA, ","},
+		{token.INT, "2"},
+		{token.RBRACKET, "]"},
+		{token.EOF, ""},
+	}
+
+	lx := New(input)
+
+	for i, test := range tests {
+		tk := lx.NextToken()
+
+		if tk.Type != test.expectedType {
+			t.Fatalf("tests [%d] - token type wrong. expected %q, actual %q",
+				i, test.expectedType, tk.Type)
+		}
+
+		if tk.Literal != test.expectedLiteral {
+			t.Fatalf("tests [%d] - token value wrong. expected %q, actual %q",
+				i, test.expectedLiteral, tk.Literal)
+		}
+	}
+}
