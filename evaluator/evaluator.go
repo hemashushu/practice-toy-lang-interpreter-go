@@ -141,6 +141,9 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		return &object.Array{
 			Elements: objs,
 		}
+
+	case *ast.HashLiteral:
+		return evalHashLiteral(n, env)
 	}
 
 	return nil
@@ -167,20 +170,38 @@ func evalIndexExpression(left object.Object, index object.Object) object.Object 
 	switch {
 	case left.Type() == object.ARRAY_OBJ && index.Type() == object.INTEGER_OBJ:
 		return evalArrayIndexExpression(left, index)
+	case left.Type() == object.HASH_OBJ:
+		return evalHashIndexExpression(left, index)
 	default:
 		return newError("index operator not supported: %s", left.Type())
 	}
 }
 
-func evalArrayIndexExpression(array, index object.Object) object.Object {
+func evalArrayIndexExpression(array object.Object, index object.Object) object.Object {
 	arrayObject := array.(*object.Array)
 	idx := index.(*object.Integer).Value
 	max := int64(len(arrayObject.Elements) - 1)
 	if idx < 0 || idx > max {
 		// out of index
-		return NULL
+		return NULL // 索引超出范围时，返回 NULL
 	}
 	return arrayObject.Elements[idx]
+}
+
+func evalHashIndexExpression(hash object.Object, key object.Object) object.Object {
+	hashObject := hash.(*object.Hash)
+
+	hashable, ok := key.(object.Hashable)
+	if !ok {
+		return newError("unsupported type for hash key: %s", key.Type())
+	}
+
+	pair, ok := hashObject.Pairs[hashable.HashKey()]
+	if !ok {
+		return NULL // 不存在指定的 key 时，返回 NULL
+	}
+
+	return pair.Value
 }
 
 func evalIdentifier(node *ast.Identifier, env *object.Environment) object.Object {
@@ -368,9 +389,20 @@ func evalStringInfixExpression(operator string, left object.Object, right object
 	leftValue := left.(*object.String).Value
 	rightValue := right.(*object.String).Value
 
-	if operator == "+" {
+	switch operator {
+	case "+":
 		return &object.String{Value: leftValue + rightValue}
-	} else {
+
+	case "<":
+		return nativeBoolToBooleanObject(leftValue < rightValue)
+	case ">":
+		return nativeBoolToBooleanObject(leftValue > rightValue)
+	case "==":
+		return nativeBoolToBooleanObject(leftValue == rightValue)
+	case "!=":
+		return nativeBoolToBooleanObject(leftValue != rightValue)
+
+	default:
 		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
 	}
 }
@@ -479,4 +511,32 @@ func unwrapReturnValue(obj object.Object) object.Object {
 		return returnValue.Value
 	}
 	return obj
+}
+
+func evalHashLiteral(
+	node *ast.HashLiteral,
+	env *object.Environment) object.Object {
+
+	pairs := make(map[object.HashKey]object.HashPair)
+
+	for keyNode, valueNode := range node.Pairs {
+		key := Eval(keyNode, env)
+		if isError(key) {
+			return key
+		}
+
+		hashKey, ok := key.(object.Hashable)
+		if !ok {
+			return newError("unsupported type for hash key: %s", key.Type())
+		}
+
+		value := Eval(valueNode, env)
+		if isError(value) {
+			return value
+		}
+
+		hashed := hashKey.HashKey()
+		pairs[hashed] = object.HashPair{Key: key, Value: value}
+	}
+	return &object.Hash{Pairs: pairs}
 }

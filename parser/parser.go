@@ -119,16 +119,17 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.FALSE, p.parseBooleanLiteral)
 	p.registerPrefix(token.STRING, p.parseStringLiteral)
 
-	p.registerPrefix(token.LPAREN, p.parseGroupedExpression) // 表达式括号
-	p.registerPrefix(token.LBRACKET, p.parseArrayLiteral)    // 数组字面量中括号
+	p.registerPrefix(token.LPAREN, p.parseGroupedExpression) // 表达式括号 (...)
+	p.registerPrefix(token.LBRACKET, p.parseArrayLiteral)    // 数组字面量中括号 [...]
+	p.registerPrefix(token.LBRACE, p.parseHashLiteral)       // 映射表字面量花括号 {...}
 
 	p.registerPrefix(token.IF, p.parseIfExpression)             // 当前 toy lang 里，if 是表达式（而不是语句）
 	p.registerPrefix(token.FUNCTION, p.parseFunctionExpression) // 当前 toy lang 里，fn 是表达式
 
 	// 注册一元操作符解析过程
-	p.registerPrefix(token.BANG, p.parsePrefixExpression)
-	p.registerPrefix(token.MINUS, p.parsePrefixExpression)
-	p.registerPrefix(token.PLUS, p.parsePrefixExpression)
+	p.registerPrefix(token.BANG, p.parsePrefixExpression)  // !
+	p.registerPrefix(token.MINUS, p.parsePrefixExpression) // -
+	p.registerPrefix(token.PLUS, p.parsePrefixExpression)  // +
 
 	// 注册二元操作符解析过程
 	p.registerInfix(token.PLUS, p.parseInfixExpression)     // +
@@ -461,6 +462,40 @@ func (p *Parser) parseArrayLiteral() ast.Expression {
 	array := &ast.ArrayLiteral{Token: p.curToken}
 	array.Elements = p.parseExpressionList(token.RBRACKET)
 	return array
+}
+
+func (p *Parser) parseHashLiteral() ast.Expression {
+	hash := &ast.HashLiteral{Token: p.curToken}
+	hash.Pairs = make(map[ast.Expression]ast.Expression)
+
+	// 当前位于 token "{"
+
+	for !p.peekTokenIs(token.RBRACE) { // 有可能存在空映射表，即 "{}"
+		p.nextToken()
+
+		key := p.parseExpression(LOWEST) // key 和 value 都有可能是任意 expression
+		if !p.expectPeek(token.COLON) {
+			return nil
+		}
+
+		// 当前处于 token ":"
+		p.nextToken()
+
+		value := p.parseExpression(LOWEST)
+
+		hash.Pairs[key] = value
+
+		// 下一个应该是 "," 或者 "}"
+		if p.peekTokenIs(token.COMMA) {
+			p.nextToken()
+		}
+	}
+
+	if !p.expectPeek(token.RBRACE) {
+		return nil
+	}
+
+	return hash
 }
 
 func (p *Parser) noPrefixParseFnError(t token.TokenType) {

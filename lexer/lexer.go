@@ -32,7 +32,9 @@ func (lx *Lexer) readChar() {
 func (lx *Lexer) NextToken() token.Token {
 	var tk token.Token
 
-	lx.skipWhitespace()
+	for lx.skipComment() || lx.skipWhitespace() {
+		//
+	}
 
 	switch lx.ch {
 	case '=':
@@ -71,6 +73,8 @@ func (lx *Lexer) NextToken() token.Token {
 		tk = newToken(token.SEMICOLON, lx.ch)
 	case ',':
 		tk = newToken(token.COMMA, lx.ch)
+	case ':':
+		tk = newToken(token.COLON, lx.ch)
 
 	case '(':
 		tk = newToken(token.LPAREN, lx.ch)
@@ -150,10 +154,24 @@ func newToken(tokenType token.TokenType, ch byte) token.Token {
 	}
 }
 
-func (lx *Lexer) skipWhitespace() {
+func (lx *Lexer) skipWhitespace() bool {
+	var found = false
 	for lx.ch == ' ' || lx.ch == '\t' || lx.ch == '\n' || lx.ch == '\r' {
+		found = true
 		lx.readChar()
 	}
+	return found
+}
+
+func (lx *Lexer) skipComment() bool {
+	var found = false
+	if lx.ch == '/' && lx.peekChar() == '/' {
+		found = true
+		for !(lx.ch == '\n' || lx.ch == '\r' || lx.ch == 0) {
+			lx.readChar()
+		}
+	}
+	return found
 }
 
 func (lx *Lexer) readIdentifier() string {

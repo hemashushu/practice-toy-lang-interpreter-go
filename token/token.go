@@ -40,6 +40,7 @@ const (
 	// 分隔符
 	COMMA     = ","
 	SEMICOLON = ";"
+	COLON     = ":"
 
 	// 括号
 	LPAREN   = "("

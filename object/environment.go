@@ -1,3 +1,5 @@
+// original from https://interpreterbook.com/
+
 package object
 
 type Environment struct {
