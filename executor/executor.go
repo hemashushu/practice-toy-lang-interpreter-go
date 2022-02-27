@@ -6,15 +6,16 @@ import (
 	"interpreter/lexer"
 	"interpreter/object"
 	"interpreter/parser"
-	"log"
 	"os"
 )
 
 func Exec(filePath string) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Printf("Read file error: %s\n", err)
+		return
 	}
+
 	text := string(content)
 
 	l := lexer.New(text)
@@ -34,7 +35,7 @@ func Exec(filePath string) {
 }
 
 func printParserErrors(errors []string) {
-	fmt.Println("parser errors:")
+	fmt.Println("Parser errors:")
 	for _, msg := range errors {
 		fmt.Println("\t" + msg)
 	}
