@@ -484,7 +484,7 @@ func applyFunction(fn object.Object, args []object.Object) object.Object {
 		// 即静态范围(static scope)
 		extendedEnv := extendFunctionEnv(f, args)
 		evaluated := Eval(f.Body, extendedEnv)
-		return unwrapReturnValue(evaluated)
+		return unwrapReturnValue(evaluated) // 拆封 ReturnValue，避免一直往上传递
 
 	case *object.Builtin:
 		return f.Fn(args...)

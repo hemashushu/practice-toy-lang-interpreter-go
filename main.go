@@ -1,5 +1,4 @@
-// original from
-// https://interpreterbook.com/
+// original from https://interpreterbook.com/
 
 package main
 
