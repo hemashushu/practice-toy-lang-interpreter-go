@@ -1,0 +1,9 @@
+let array = [1,2,3,4,5];
+
+puts(array)
+
+let headAndTail = fn(a) {
+    [first(a), last(a)]
+}
+
+puts(headAndTail(array))

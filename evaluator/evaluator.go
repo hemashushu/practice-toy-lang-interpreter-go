@@ -14,68 +14,68 @@ var (
 	NULL  = &object.Null{}
 )
 
-func Eval(node ast.Node, env *object.Environment) object.Object {
-	switch n := node.(type) {
+func Eval(n ast.Node, env *object.Environment) object.Object {
+	switch node := n.(type) {
 
 	// 对语句求值
 	case *ast.Program:
-		return evalProgram(n, env)
+		return evalProgram(node, env)
 
 	case *ast.BlockStatement:
-		return evalBlockStatement(n, env)
+		return evalBlockStatement(node, env)
 
 	case *ast.ExpressionStatement:
-		return Eval(n.Expression, env)
+		return Eval(node.Expression, env)
 
 	case *ast.ReturnStatement:
-		val := Eval(n.ReturnValue, env)
+		val := Eval(node.ReturnValue, env)
 		if isError(val) {
 			return val
 		}
 		return &object.ReturnValue{Value: val} // 包裹待返回的 Object
 
 	case *ast.LetStatement:
-		val := Eval(n.Value, env)
+		val := Eval(node.Value, env)
 		if isError(val) {
 			return val
 		}
-		env.Set(n.Name.Value, val)
+		env.Set(node.Name.Value, val)
 
 	// 对表达式求值
 	case *ast.PrefixExpression:
-		right := Eval(n.Right, env)
+		right := Eval(node.Right, env)
 		if isError(right) {
 			return right
 		}
-		return evalPrefixExpression(n.Operator, right)
+		return evalPrefixExpression(node.Operator, right)
 
 	case *ast.InfixExpression:
-		left := Eval(n.Left, env)
+		left := Eval(node.Left, env)
 		if isError(left) {
 			return left
 		}
-		right := Eval(n.Right, env)
+		right := Eval(node.Right, env)
 		if isError(right) {
 			return right
 		}
-		return evalInfixExpression(n.Operator, left, right)
+		return evalInfixExpression(node.Operator, left, right)
 
 	case *ast.IfExpression:
-		return evalIfExpression(n, env)
+		return evalIfExpression(node, env)
 
 	case *ast.FunctionLiteral:
-		params := n.Parameters
-		body := n.Body
+		params := node.Parameters
+		body := node.Body
 		return &object.Function{Parameters: params, Body: body, Env: env}
 
 	case *ast.CallExpression:
-		function := Eval(n.Function, env)
+		function := Eval(node.Function, env)
 		if isError(function) {
 			return function
 		}
 
 		// 先对每个实参求值
-		args := evalExpressions(n.Arguments, env)
+		args := evalExpressions(node.Arguments, env)
 
 		// for _, arg := range args {
 		// 	if isError(arg) {
@@ -93,12 +93,12 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 
 	// 对索引表达式求值
 	case *ast.IndexExpression:
-		left := Eval(n.Left, env)
+		left := Eval(node.Left, env)
 		if isError(left) {
 			return left
 		}
 
-		index := Eval(n.Index, env)
+		index := Eval(node.Index, env)
 		if isError(index) {
 			return index
 		}
@@ -112,17 +112,17 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		// 	return newError("identifier not found: " + n.Value)
 		// }
 		// return val
-		return evalIdentifier(n, env)
+		return evalIdentifier(node, env)
 
 	// 对字面量求值
 	case *ast.IntegerLiteral:
-		return &object.Integer{Value: n.Value}
+		return &object.Integer{Value: node.Value}
 
 	case *ast.Boolean:
-		return nativeBoolToBooleanObject(n.Value)
+		return nativeBoolToBooleanObject(node.Value)
 
 	case *ast.StringLiteral:
-		return &object.String{Value: n.Value}
+		return &object.String{Value: node.Value}
 
 	case *ast.ArrayLiteral:
 		// objs := []object.Object{}
@@ -133,7 +133,7 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		// 	}
 		// 	objs = append(objs, obj)
 		// }
-		objs := evalExpressions(n.Elements, env)
+		objs := evalExpressions(node.Elements, env)
 		if len(objs) == 1 && isError(objs[0]) {
 			return objs[0]
 		}
@@ -143,7 +143,7 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		}
 
 	case *ast.HashLiteral:
-		return evalHashLiteral(n, env)
+		return evalHashLiteral(node, env)
 	}
 
 	return nil

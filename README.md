@@ -92,7 +92,9 @@ puts(n); // 输出 15
 
 运行：
 
-`$ go run . examples/02-sum.toy`
+`$ go run . examples/03-sum.toy`
+
+如无意外应该能看到输出 15。
 
 ### 斐波那契数
 
@@ -116,4 +118,6 @@ fib(9) // 34
 
 运行：
 
-`$ go run . examples/03-fib.toy`
+`$ go run . examples/04-fib.toy`
+
+如无意外应该能看到输出 34。
